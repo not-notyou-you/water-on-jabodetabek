@@ -24,15 +24,26 @@ st.set_page_config(page_title='Water on Jabodetabek', layout='wide')
 st.markdown(tampilan.CSS, unsafe_allow_html=True)
 
 
-@st.cache_resource(show_spinner=False)
-def ambil_artefak():
+def versi_artefak():
+    return tuple((p.name, p.stat().st_size, int(p.stat().st_mtime)) for p in sorted(FOLDER_ARTEFAK.iterdir()) if p.is_file())
+
+
+@st.cache_resource(show_spinner=False, max_entries=1)
+def _muat_artefak(versi):
     return inti.muat_artefak(FOLDER_ARTEFAK)
 
 
-@st.cache_resource(show_spinner=False)
-def verifikasi_awal():
+def ambil_artefak():
+    return _muat_artefak(versi_artefak())
+
+
+@st.cache_resource(show_spinner=False, max_entries=1)
+def _verifikasi(versi):
     return inti.cek_verifikasi(ambil_artefak(), inti.muat_verify(FOLDER_ARTEFAK))
 
+
+def verifikasi_awal():
+    return _verifikasi(versi_artefak())
 
 @st.cache_resource(show_spinner=False)
 def cache_bersama():
