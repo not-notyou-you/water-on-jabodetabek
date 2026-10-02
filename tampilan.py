@@ -81,6 +81,21 @@ CSS = (
     '.kt-sub{font-size:.76rem;color:#9a9ea8;margin-top:.15rem}'
     '.kt-kat{display:flex;align-items:center;gap:.4rem;font-weight:700;margin-top:.7rem;font-size:.95rem}'
     '.kt-pil{margin-top:.65rem}'
+    '.label-kanan{margin:0}'
+    
+    '.st-key-info_hujan button{color:#1f2a44;padding:0;min-height:0}'
+    '[data-testid="stDialog"] [role="dialog"]{border-radius:8px;border:1px solid #e6e3dc;background:#ffffff}'
+    '[data-testid="stDialog"]{background:rgba(0,0,0,0.5) !important;align-items:center !important}'
+    '[data-testid="stDialog"]>div:first-child{background:transparent !important;margin:auto !important;max-height:92vh}'
+    '[data-testid="stDialog"] section[role="dialog"]{max-height:88vh;overflow-y:auto}'
+    '.modal-isi{color:#4b5160;font-size:.92rem;line-height:1.6}'
+    '.modal-blok{display:flex;gap:.8rem;align-items:flex-start;padding:.9rem 0;border-top:1px solid #efede7}'
+    '.modal-blok:first-child{border-top:none;padding-top:.2rem}'
+    '.modal-nomor{flex:none;width:1.8rem;height:1.8rem;border-radius:50%;background:#1f2a44;color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Source Serif 4",Georgia,serif;font-size:.95rem}'
+    '.modal-judul{font-family:"Source Serif 4",Georgia,serif;font-size:1.08rem;color:#1f2a44;font-weight:600;margin-bottom:.2rem}'
+    '.modal-cocok{font-size:.82rem;color:#7a7f8a;margin-top:.35rem}'
+    '.modal-cocok b{color:#1f2a44}'
+    '.modal-catatan{background:#f6f5f1;border:1px solid #e6e3dc;border-radius:6px;padding:.8rem .95rem;margin-top:.6rem;font-size:.86rem}'
     '.penjelasan{display:grid;gap:.45rem;font-size:.84rem;color:#4b5160}'
     '.penjelasan>div{display:flex;gap:.5rem;align-items:flex-start}'
     '.pj-cat{color:#7a7f8a;font-size:.8rem;margin-top:.2rem}'
@@ -332,3 +347,41 @@ def figur_akurasi_luas(scene):
                       legend=dict(orientation='h', y=-0.2, x=0), yaxis=dict(title='Luas genangan (km²)', gridcolor='#efede7'),
                       xaxis=dict(gridcolor='#efede7'))
     return fig
+
+
+def modal_sumber_hujan_html():
+    blok = [
+        ('Sumber curah hujan',
+         'Bayangkan aplikasi ini seperti orang yang ingin menebak apakah jalan di depan rumahnya akan tergenang pada '
+         'tanggal tertentu. Untuk menebak, ia perlu tahu berapa banyak hujan yang turun menjelang tanggal itu. Ketiga '
+         'pilihan di bawah ini hanyalah tiga cara berbeda untuk memberi tahu aplikasi "hujannya seberapa banyak".',
+         None),
+        ('Rata-rata bulanan',
+         'Aplikasi memakai hujan yang biasanya turun di bulan itu, berdasarkan data 2023–2026. Kalau kamu memilih '
+         'tanggal di bulan Januari, aplikasi menganggap hujannya sebanyak hujan Januari pada umumnya, yaitu cukup '
+         'deras. Kalau Agustus, hujannya dianggap sedikit, seperti Agustus biasanya.',
+         'pertanyaan "kira-kira bagaimana kondisi genangan di tanggal itu kalau cuacanya biasa-biasa saja?" '
+         'Tidak perlu login apa pun.'),
+        ('Atur manual',
+         'Kamu sendiri yang menentukan seberapa deras hujannya lewat slider, atau cukup tekan tombol Kemarau, Normal, '
+         'atau Ekstrem. Ini seperti bertanya "bagaimana kalau...". Misalnya, "bagaimana kalau seminggu sebelum '
+         'tanggal itu hujan deras terus?"',
+         'mencoba-coba kemungkinan, misalnya membandingkan apa yang terjadi kalau musim kering dengan kalau hujan ekstrem.'),
+        ('Data resmi NASA',
+         'Aplikasi mengambil catatan hujan sungguhan yang diukur satelit NASA untuk hari-hari menjelang tanggal yang '
+         'kamu pilih. Jadi bukan perkiraan, tetapi hujan yang benar-benar turun. Karena datanya dari NASA, kamu perlu '
+         'akun NASA (gratis) untuk memakainya. Catatan hujan hanya ada untuk hari yang sudah lewat. Untuk tanggal hari '
+         'ini atau ke depan, aplikasi otomatis kembali memakai rata-rata bulanan, karena hujan masa depan belum bisa '
+         'diukur.',
+         'melihat kondisi tanggal yang sudah lewat, berdasarkan hujan yang benar-benar terjadi.'),
+    ]
+    isi = []
+    for i, (judul, teks, cocok) in enumerate(blok):
+        nomor = f'<div class="modal-nomor">{i + 1}</div>'
+        tambahan = f'<div class="modal-cocok"><b>Cocok untuk:</b> {cocok}</div>' if cocok else ''
+        isi.append(f'<div class="modal-blok">{nomor}<div><div class="modal-judul">{judul}</div>{teks}{tambahan}</div></div>')
+    catatan = ('<div class="modal-catatan"><b>Yang perlu diketahui:</b> ketiga pilihan ini biasanya menghasilkan peta '
+               'yang mirip. Itu bukan kesalahan. Dari data yang dipelajarinya, model ini menemukan bahwa genangan di '
+               'Jabodetabek lebih banyak ditentukan oleh di mana air biasanya menggenang (tambak, rawa, sungai, daerah '
+               'rendah) daripada oleh deras-tidaknya hujan beberapa hari terakhir. Hujan tetap berpengaruh, tetapi kecil.</div>')
+    return f'<div class="modal-isi">{"".join(isi)}{catatan}</div>'

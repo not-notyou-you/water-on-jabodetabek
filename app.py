@@ -45,6 +45,12 @@ def _verifikasi(versi):
 def verifikasi_awal():
     return _verifikasi(versi_artefak())
 
+
+@st.dialog('Sumber curah hujan', width='medium')
+def modal_sumber_hujan():
+    st.markdown(tampilan.modal_sumber_hujan_html(), unsafe_allow_html=True)
+
+
 @st.cache_resource(show_spinner=False)
 def cache_bersama():
     return {'hasil': {}, 'kunci': threading.Lock()}
@@ -423,7 +429,11 @@ with tab_prediksi:
                     f'Tanggal terjauh butuh {terjauh} langkah, melebihi rentang uji mundur ({batas_uji} langkah). '
                     'Hasilnya tetap dihitung, tetapi keandalannya belum teruji.'), unsafe_allow_html=True)
 
-        st.markdown(tampilan.label_kecil('Sumber curah hujan'), unsafe_allow_html=True)
+        with st.container(horizontal=True, horizontal_alignment='center', vertical_alignment='center', gap='small'):
+            st.markdown('<div class="label-kecil label-kanan">Sumber curah hujan</div>', unsafe_allow_html=True,
+                        width='content')
+            if st.button('', icon=':material/info:', key='info_hujan', type='tertiary', width='content'):
+                modal_sumber_hujan()
         mode = st.radio('Sumber curah hujan', MODE_HUJAN, horizontal=True, key='mode_hujan',
                         label_visibility='collapsed')
         nilai_manual = None
