@@ -1,7 +1,7 @@
 # topik1/inti.py
 import json
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -9,11 +9,11 @@ import pandas as pd
 import torch
 
 KANAL_HUJAN = ('rf24', 'rf72', 'rf7d')
-KANAL_TETAP = (('ndvi', 'ndvi_target'), ('ndwi', 'ndwi_target'), ('ndwi_valid', 'ndwi_valid_target'),
-               ('land_dist', 'land_dist_target'), ('hist_freq', 'hist_target'))
+KANAL_TETAP = (('land_dist', 'land_dist_target'), ('hist_freq', 'hist_target'))
+KANAL_MODIS = (('ndvi', 'ndvi_target'), ('ndwi', 'ndwi_target'), ('ndwi_valid', 'ndwi_valid_target'))
 NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus',
               'September', 'Oktober', 'November', 'Desember']
-KELAS_BANJIR = ['Tidak tergenang', 'Tergenang', 'Laut']
+KELAS_BANJIR = ['Kering', 'Air', 'Laut']
 KELAS_PERUBAHAN = ['Tetap kering', 'Genangan baru', 'Tetap tergenang', 'Surut', 'Laut / tanpa data']
 JUMLAH_THREAD = 2
 
@@ -56,8 +56,25 @@ def muat_artefak(folder):
     return {'meta': meta, 'kondisi': kondisi, 'riwayat': riwayat, 'model': model}
 
 
-def bentuk_frame_target(artefak, skenario):
+def norm_tersedia(meta, kanal):
+    return kanal in meta.get('norm', {}) or kanal in meta.get('norm_modis', {})
+
+
+def _norm(meta, kanal):
+    if kanal in meta.get('norm', {}):
+        return meta['norm'][kanal]
+    return meta['norm_modis'][kanal]
+
+
+def z_mentah(meta, kanal, nilai):
+    m, s = _norm(meta, kanal)
+    a = np.asarray(nilai).astype(np.float16).astype(np.float32)
+    return np.nan_to_num((a - np.float32(m)) / np.float32(s), nan=0.0)
+
+
+def bentuk_frame_target(artefak, skenario, peta_input=None):
     meta, ka = artefak['meta'], artefak['kondisi']
+    peta_input = peta_input or {}
     ch = meta['frame_ch']
     darat = ka['darat']
     target = np.zeros((len(ch), *darat.shape), np.float16)
@@ -71,8 +88,20 @@ def bentuk_frame_target(artefak, skenario):
         target[ch.index(kanal)] = a.astype(np.float16)
 
     for x in KANAL_HUJAN:
-        m, s = meta['norm'][x]
-        isi(x, (ka[f'pola_{x}'].astype(np.float32) * np.float32(skenario[x]) - np.float32(m)) / np.float32(s))
+        if peta_input.get(x) is not None:
+            isi(x, z_mentah(meta, x, peta_input[x]))
+        else:
+            m, s = meta['norm'][x]
+            isi(x, (ka[f'pola_{x}'].astype(np.float32) * np.float32(skenario[x]) - np.float32(m)) / np.float32(s))
+    pakai_modis = (peta_input.get('ndvi') is not None and peta_input.get('ndwi') is not None
+                   and norm_tersedia(meta, 'ndvi') and norm_tersedia(meta, 'ndwi'))
+    if pakai_modis:
+        isi('ndvi', z_mentah(meta, 'ndvi', peta_input['ndvi']))
+        isi('ndwi', z_mentah(meta, 'ndwi', peta_input['ndwi']))
+        isi('ndwi_valid', np.isfinite(np.asarray(peta_input['ndwi']).astype(np.float16).astype(np.float32)).astype(np.float32))
+    else:
+        for kanal, kunci in KANAL_MODIS:
+            isi(kanal, ka[kunci].astype(np.float32))
     for kanal, kunci in KANAL_TETAP:
         isi(kanal, ka[kunci].astype(np.float32))
     m, s = meta['norm']['gap_days']
@@ -80,7 +109,7 @@ def bentuk_frame_target(artefak, skenario):
     return target
 
 
-def inferensi_bertile(model, riwayat, target, ukuran_tile, overlap_tile):
+def inferensi_bertile(model, riwayat, target, ukuran_tile, overlap_tile, lapor=None):
     torch.set_num_threads(JUMLAH_THREAD)
     T = riwayat.shape[0] + 1
     C, H, W = target.shape
@@ -88,18 +117,20 @@ def inferensi_bertile(model, riwayat, target, ukuran_tile, overlap_tile):
     hitung = np.zeros((H, W), np.float32)
     stride = ukuran_tile - 2 * overlap_tile
     x = np.zeros((T, C, ukuran_tile, ukuran_tile), np.float32)
+    posisi = [(r, c) for r in range(0, H, stride) for c in range(0, W, stride)]
     with torch.inference_mode():
-        for r in range(0, H, stride):
-            for c in range(0, W, stride):
-                r0, c0 = max(r - overlap_tile, 0), max(c - overlap_tile, 0)
-                r1, c1 = min(r0 + ukuran_tile, H), min(c0 + ukuran_tile, W)
-                h, w = r1 - r0, c1 - c0
-                x.fill(0)
-                x[:T - 1, :, :h, :w] = riwayat[:, :, r0:r1, c0:c1]
-                x[T - 1, :, :h, :w] = target[:, r0:r1, c0:c1]
-                p = torch.sigmoid(model(torch.from_numpy(x)[None]))[0].numpy()
-                akumulasi[r0:r1, c0:c1] += p[:h, :w]
-                hitung[r0:r1, c0:c1] += 1
+        for i, (r, c) in enumerate(posisi):
+            r0, c0 = max(r - overlap_tile, 0), max(c - overlap_tile, 0)
+            r1, c1 = min(r0 + ukuran_tile, H), min(c0 + ukuran_tile, W)
+            h, w = r1 - r0, c1 - c0
+            x.fill(0)
+            x[:T - 1, :, :h, :w] = riwayat[:, :, r0:r1, c0:c1]
+            x[T - 1, :, :h, :w] = target[:, r0:r1, c0:c1]
+            p = torch.sigmoid(model(torch.from_numpy(x)[None]))[0].numpy()
+            akumulasi[r0:r1, c0:c1] += p[:h, :w]
+            hitung[r0:r1, c0:c1] += 1
+            if lapor is not None:
+                lapor((i + 1) / len(posisi))
     return akumulasi / np.maximum(hitung, 1)
 
 
@@ -111,24 +142,31 @@ def status_genangan(meta, persen):
     return 'Bahaya'
 
 
-def ringkasan(meta, darat, prob):
-    air = (prob >= meta['threshold']) & darat
+def ringkasan(meta, darat, prob, threshold=None):
+    thr = float(meta['threshold'] if threshold is None else threshold)
+    air = (prob >= thr) & darat
     n_tergenang, n_darat = int(air.sum()), int(darat.sum())
     persen = n_tergenang / max(n_darat, 1) * 100
     luas = n_tergenang * meta['px_km2']
-    return {'air': air, 'n_tergenang': n_tergenang, 'n_darat': n_darat,
+    return {'air': air, 'threshold': thr, 'n_tergenang': n_tergenang, 'n_darat': n_darat,
             'persen_tergenang': float(persen), 'luas_tergenang_km2': float(luas),
             'perubahan_km2': float(luas - meta['kondisi_awal_ringkas']['luas_air_km2']),
-            'prob_rata_darat': float(prob[darat].mean()), 'status': status_genangan(meta, persen)}
+            'prob_rata_darat': float(prob[darat].astype(np.float32).mean()), 'status': status_genangan(meta, persen)}
 
 
-def prediksi_skenario(artefak, skenario, ukuran_tile=None):
+def prediksi_skenario(artefak, skenario, ukuran_tile=None, peta_input=None, lapor=None):
     meta = artefak['meta']
     darat = artefak['kondisi']['darat']
     tile = int(ukuran_tile or meta['ukuran_tile'])
-    target = bentuk_frame_target(artefak, skenario)
-    prob = inferensi_bertile(artefak['model'], artefak['riwayat'], target, tile, int(meta['overlap_tile']))
+    target = bentuk_frame_target(artefak, skenario, peta_input)
+    prob = inferensi_bertile(artefak['model'], artefak['riwayat'], target, tile, int(meta['overlap_tile']), lapor)
     return {'prob': prob, **ringkasan(meta, darat, prob)}
+
+
+def terapkan_threshold(meta, darat, hasil, threshold):
+    if abs(float(threshold) - hasil['threshold']) < 1e-12:
+        return hasil
+    return {**hasil, **ringkasan(meta, darat, hasil['prob'].astype(np.float32), threshold)}
 
 
 def untuk_cache(hasil):
@@ -150,17 +188,47 @@ def cek_verifikasi(verify, hasil):
 
 
 def ke_tanggal(teks):
-    return datetime.strptime(str(teks), '%Y%m%d')
+    if isinstance(teks, datetime):
+        return teks.date()
+    if isinstance(teks, date):
+        return teks
+    return datetime.strptime(str(teks), '%Y%m%d').date()
+
+
+def tanggal_riwayat_akhir(meta):
+    return ke_tanggal(meta['tanggal_riwayat'][-1])
 
 
 def tanggal_prediksi(meta, gap_days):
-    return ke_tanggal(meta['tanggal_riwayat'][-1]) + timedelta(days=int(round(float(gap_days))))
+    return tanggal_riwayat_akhir(meta) + timedelta(days=int(round(float(gap_days))))
 
 
 def format_tanggal(tgl):
-    if not isinstance(tgl, datetime):
-        tgl = ke_tanggal(tgl)
+    tgl = ke_tanggal(tgl)
     return f'{tgl.day} {NAMA_BULAN[tgl.month - 1]} {tgl.year}'
+
+
+def gap_untuk_tanggal(meta, tgl):
+    gap_nyata = (ke_tanggal(tgl) - tanggal_riwayat_akhir(meta)).days
+    s = meta['slider']['gap_days']
+    gap_model = int(min(max(gap_nyata, s['min']), s['maks']))
+    return gap_nyata, gap_model
+
+
+def rata_darat(darat, peta):
+    if peta is None:
+        return None
+    nilai = np.asarray(peta, np.float32)[darat]
+    nilai = nilai[np.isfinite(nilai)]
+    return float(nilai.mean()) if len(nilai) else None
+
+
+def koordinat_piksel(meta):
+    lon_min, lon_maks, lat_min, lat_maks = meta['grid']['extent']
+    H, W = meta['grid']['H'], meta['grid']['W']
+    lon = lon_min + (np.arange(W) + 0.5) * (lon_maks - lon_min) / W
+    lat = lat_maks - (np.arange(H) + 0.5) * (lat_maks - lat_min) / H
+    return lon, lat
 
 
 def faktor_tampilan(H, W, sisi_maks=500):
@@ -224,14 +292,20 @@ def koordinat_tampilan(meta, h, w, f):
     return lon, lat, rasio
 
 
-def tabel_ringkasan(meta, skenario, hasil):
+def tabel_ringkasan(meta, entri, hasil):
+    sk = entri['skenario']
     baris = [('Model', 'Nama', meta['nama_model']),
-             ('Model', 'Threshold', meta['threshold']),
-             ('Riwayat', 'Tanggal observasi', ', '.join(meta['tanggal_riwayat'])),
-             ('Skenario', 'Tanggal prediksi', tanggal_prediksi(meta, skenario['gap_days']).strftime('%Y-%m-%d'))]
+             ('Model', 'Threshold dipakai', round(hasil['threshold'], 4)),
+             ('Model', 'Threshold validasi', round(meta['threshold'], 4)),
+             ('Riwayat', 'Tanggal observasi Sentinel-1', ', '.join(meta['tanggal_riwayat'])),
+             ('Input', 'Sumber', entri['sumber']),
+             ('Input', 'Tanggal prediksi', ke_tanggal(entri['tanggal']).isoformat())]
     for k, s in meta['slider'].items():
-        baris.append(('Skenario', f'{s["label"]} ({s["satuan"]})', skenario[k]))
-    baris += [('Hasil', 'Persen tergenang (%)', round(hasil['persen_tergenang'], 4)),
+        if sk.get(k) is not None:
+            baris.append(('Input', f'{s["label"]} ({s["satuan"]})', round(float(sk[k]), 3)))
+    for c in entri.get('catatan', []):
+        baris.append(('Catatan', '', c))
+    baris += [('Hasil', 'Persen daratan tergenang (%)', round(hasil['persen_tergenang'], 4)),
               ('Hasil', 'Luas tergenang (km2)', round(hasil['luas_tergenang_km2'], 4)),
               ('Hasil', 'Luas tergenang (ha)', round(hasil['luas_tergenang_km2'] * 100, 2)),
               ('Hasil', 'Perubahan vs scene terakhir (km2)', round(hasil['perubahan_km2'], 4)),

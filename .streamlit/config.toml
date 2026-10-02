@@ -1,10 +1,11 @@
 # topik1/.streamlit/config.toml
 [theme]
 base = "light"
-primaryColor = "#2563eb"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f3f4f6"
-textColor = "#111827"
+primaryColor = "#1f2a44"
+backgroundColor = "#f6f5f1"
+secondaryBackgroundColor = "#efede7"
+textColor = "#1f2a44"
+font = "sans serif"
 
 [browser]
 gatherUsageStats = false
