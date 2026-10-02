@@ -1,0 +1,185 @@
+{
+  "versi_kontrak": "2.0",
+  "versi_torch": "2.9.1",
+  "nama_model": "ContextCNN",
+  "jenis_model": "CNN spasial-temporal",
+  "tanggal_ekspor": "2026-10-02",
+  "tanggal_riwayat": [
+    "20260611",
+    "20260623",
+    "20260630"
+  ],
+  "seq_len": 4,
+  "frame_ch": [
+    "water",
+    "water_valid",
+    "vv_db",
+    "rf24",
+    "rf72",
+    "rf7d",
+    "ndvi",
+    "ndwi",
+    "ndwi_valid",
+    "land_dist",
+    "gap_days",
+    "hist_freq"
+  ],
+  "norm": {
+    "rf24": [
+      7.480565071105957,
+      6.576278256011963
+    ],
+    "rf72": [
+      34.7391471862793,
+      28.12774758203125
+    ],
+    "rf7d": [
+      69.1619644165039,
+      35.64349083764648
+    ],
+    "gap_days": [
+      10.5,
+      1.9364927278289794
+    ]
+  },
+  "threshold": 0.879582941532135,
+  "ukuran_tile": 128,
+  "overlap_tile": 16,
+  "px_km2": 0.0025274467100041137,
+  "grid": {
+    "H": 1760,
+    "W": 1760,
+    "extent": [
+      106.4,
+      107.19995169765106,
+      -6.699951697651058,
+      -5.9
+    ]
+  },
+  "slider": {
+    "rf24": {
+      "label": "Curah hujan 24 jam",
+      "satuan": "mm",
+      "min": 0.0,
+      "maks": 49.5,
+      "default": 5.0,
+      "langkah": 0.5
+    },
+    "rf72": {
+      "label": "Curah hujan 72 jam",
+      "satuan": "mm",
+      "min": 0.0,
+      "maks": 81.0,
+      "default": 17.0,
+      "langkah": 1.0
+    },
+    "rf7d": {
+      "label": "Curah hujan 7 hari",
+      "satuan": "mm",
+      "min": 0.0,
+      "maks": 173.0,
+      "default": 51.0,
+      "langkah": 1.0
+    },
+    "gap_days": {
+      "label": "Jarak ke observasi berikutnya",
+      "satuan": "hari",
+      "min": 4,
+      "maks": 12,
+      "default": 12,
+      "langkah": 1
+    }
+  },
+  "preset": {
+    "Kemarau": {
+      "rf24": 0.0,
+      "rf72": 2.0,
+      "rf7d": 7.0,
+      "gap_days": 12
+    },
+    "Normal": {
+      "rf24": 5.0,
+      "rf72": 17.0,
+      "rf7d": 51.0,
+      "gap_days": 12
+    },
+    "Ekstrem": {
+      "rf24": 27.0,
+      "rf72": 70.0,
+      "rf7d": 134.0,
+      "gap_days": 12
+    }
+  },
+  "status": {
+    "acuan": "persen_tergenang_darat",
+    "waspada": 2.100365544164099,
+    "bahaya": 2.765391857633281
+  },
+  "kondisi_awal_ringkas": {
+    "tanggal": "20260630",
+    "luas_air_km2": 130.5729519322325,
+    "persen_tergenang": 2.0049862691312375
+  },
+  "metrik_test": {
+    "PR_AUC_dyn": 0.5953445930204903,
+    "PR_AUC_dyn_CI": "0.595 [0.492, 0.680]",
+    "PR_AUC": 0.8401136912398941,
+    "F1": 0.7546860140189564,
+    "Recall": 0.8015366365120845,
+    "Precision": 0.7130098700548135,
+    "Recall_new": 0.537837187863241,
+    "MAE_km2_sel": 0.016313461586833,
+    "R2_sel": 0.850670576095581
+  },
+  "pembanding": [
+    {
+      "nama": "Persistence",
+      "jenis": "Baseline",
+      "PR_AUC_dyn": 0.16255367855862216,
+      "F1": 0.6403184888078569,
+      "Infer_s": 0.09052133560180664
+    },
+    {
+      "nama": "Random Forest",
+      "jenis": "Konvensional",
+      "PR_AUC_dyn": 0.5584278334378692,
+      "F1": 0.7293480421573191,
+      "Infer_s": 30.18637180328369
+    },
+    {
+      "nama": "ContextCNN",
+      "jenis": "CNN spasial-temporal",
+      "PR_AUC_dyn": 0.5953445930204903,
+      "F1": 0.7546860140189564,
+      "Infer_s": 19.537534713745117
+    },
+    {
+      "nama": "Transformer",
+      "jenis": "Attention temporal",
+      "PR_AUC_dyn": 0.6057790064186307,
+      "F1": 0.7553038693963496,
+      "Infer_s": 115.68022847175598
+    }
+  ],
+  "alasan_rekomendasi": [
+    "Model direkomendasikan: ContextCNN",
+    "1. PR_AUC_dyn (metrik utama) 0.5953 [0.492, 0.680]; PR-AUC semua piksel 0.8401.",
+    "2. Transformer memiliki PR_AUC_dyn tertinggi, tetapi selisihnya terhadap ContextCNN +0.0104 [-0.0377, +0.0872] tidak signifikan; ContextCNN dipilih karena inferensi lebih cepat (19.5s vs 115.7s).",
+    "3. Diagnosis fit: Good fit (PR-AUC train 0.6657, val 0.7318, test 0.8401).",
+    "4. Klasifikasi semua piksel: F1 0.7547, Recall 0.8015, Precision 0.7130, Specificity 0.9937.",
+    "5. Genangan baru: PR-AUC 0.5608, Recall 0.5378 (Persistence: Recall 0.0000).",
+    "6. Dibanding Persistence pada PR_AUC_dyn: +0.4328 [+0.3683, +0.5128], unggul signifikan.",
+    "7. Regresi luas per sel: MAE 0.0163 km2, RMSE 0.0765 km2, R2 0.851; R2 per scene -1.521 (Persistence MAE 0.0156, R2 per scene -0.369).",
+    "8. 271,489 parameter, training 1213s, inferensi 19.5s untuk 14 scene test.",
+    "Diagnosis fit seluruh model:",
+    "- Persistence: Baseline (tanpa parameter) (train 0.433 | val 0.245 | test 0.417)",
+    "- Random Forest: Good fit (train 0.815 | val 0.653 | test 0.828)",
+    "- ContextCNN: Good fit (train 0.666 | val 0.732 | test 0.840)",
+    "- Transformer: Good fit (train 0.774 | val 0.711 | test 0.842)",
+    "Error analysis:",
+    "- FN 136,852 piksel; 84.3% adalah genangan baru yang tidak ada di scene sebelumnya.",
+    "- FP 222,467 piksel; 52.0% adalah air yang sudah surut (bias persistence).",
+    "- Scene terburuk 20260327 (F1 0.652), terbaik 20260611 (F1 0.838)."
+  ],
+  "inferensi_cpu_detik": 12.26
+}
