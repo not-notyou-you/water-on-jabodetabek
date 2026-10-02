@@ -1,6 +1,7 @@
-# topik1/tampilan.py
+# tampilan.py
 import io
 import math
+from datetime import datetime
 
 import numpy as np
 import plotly.graph_objects as go
@@ -14,17 +15,15 @@ GARIS = '#e6e3dc'
 TEKS_REDUP = '#7a7f8a'
 WARNA_BANJIR = [KERING, AIR, LAUT]
 WARNA_PERUBAHAN = [KERING, NAVY, '#9db3d1', '#c98a1b', LAUT]
-WARNA_STATUS = {'Aman': '#3f7d58', 'Waspada': '#c98a1b', 'Bahaya': '#b23b3b'}
+WARNA_ANOMALI = [KERING, '#9db3d1', NAVY, '#c98a1b', LAUT]
+WARNA_KATEGORI = {'Di bawah normal': '#3f7d58', 'Normal': '#5b6b84', 'Di atas normal': '#b23b3b'}
+WARNA_KEANDALAN = {3: '#3f7d58', 2: '#c98a1b', 1: '#b23b3b', 0: '#7a7f8a'}
 SKALA_PROB = [[0.0, '#f3f2ee'], [0.45, '#9aa6bd'], [1.0, NAVY]]
 
-IKON_STATUS = {
-    'Aman': ('<path d="M12 1.8 3.8 5v6.2c0 5.1 3.5 9.6 8.2 11 4.7-1.4 8.2-5.9 8.2-11V5L12 1.8z" fill="#3f7d58"/>'
-             '<path d="m8 12.2 2.8 2.8 5.2-6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'),
-    'Waspada': ('<path d="M10.3 3.4a2 2 0 0 1 3.4 0l8.6 15a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3l8.6-15z" fill="#c98a1b"/>'
-                '<rect x="11" y="8.2" width="2" height="7" rx="1" fill="#fff"/><circle cx="12" cy="18.1" r="1.2" fill="#fff"/>'),
-    'Bahaya': ('<rect x="10.8" y="1.5" width="2.4" height="9.5" rx="1.2" fill="#b23b3b"/><circle cx="12" cy="13.9" r="1.4" fill="#b23b3b"/>'
-               '<path d="M1.5 18.2c1.8 0 1.8-1.6 3.5-1.6s1.8 1.6 3.5 1.6 1.8-1.6 3.5-1.6 1.8 1.6 3.5 1.6 1.8-1.6 3.5-1.6 1.8 1.6 3.5 1.6" fill="none" stroke="#b23b3b" stroke-width="2" stroke-linecap="round"/>'
-               '<path d="M1.5 22.2c1.8 0 1.8-1.6 3.5-1.6s1.8 1.6 3.5 1.6 1.8-1.6 3.5-1.6 1.8 1.6 3.5 1.6 1.8-1.6 3.5-1.6 1.8 1.6 3.5 1.6" fill="none" stroke="#b23b3b" stroke-width="2" stroke-linecap="round" opacity=".55"/>'),
+IKON_KATEGORI = {
+    'Di bawah normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M12 6.5v10M7.5 12.5l4.5 4.5 4.5-4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    'Normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M7.5 9.8h9M7.5 14.2h9" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>',
+    'Di atas normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M12 17.5v-10M7.5 11.5l4.5-4.5 4.5 4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 }
 
 IKON_UI = {
@@ -64,7 +63,7 @@ CSS = (
     '.rentang{font-size:.74rem;color:#9a9ea8;margin:-.9rem 0 .7rem 0}'
     '.info-tanggal{font-size:.88rem;color:#4b5160;display:flex;align-items:center;gap:.4rem;margin:.2rem 0 .6rem 0}'
     '.statistik{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-top:1px solid #e6e3dc;border-bottom:1px solid #e6e3dc;margin:1.2rem 0 1.4rem 0}'
-    '.stat{padding:1.6rem 1rem;text-align:center;border-right:1px solid #e6e3dc}'
+    '.stat{padding:1.2rem 1rem;text-align:center;border-right:1px solid #e6e3dc}'
     '.stat:last-child{border-right:none}'
     '.stat-label{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:#7a7f8a}'
     '.stat-nilai{font-family:"Source Serif 4",Georgia,serif;font-variant-numeric:oldstyle-nums;font-size:2.1rem;color:#1f2a44;margin-top:.45rem;line-height:1.15}'
@@ -73,10 +72,28 @@ CSS = (
     '.kotak{display:inline-block;width:.7rem;height:.7rem;margin-right:.35rem;vertical-align:-0.05rem;border:1px solid #d7d3cb}'
     '.donat-wadah{max-width:240px;margin:0 auto;text-align:center}'
     '.donat-svg{width:100%;height:auto;display:block}'
+    '.pil{display:inline-block;font-size:.72rem;padding:.12rem .5rem;border:1px solid;border-radius:999px;margin-right:.35rem;font-weight:600}'
+    '.grid-tgl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;margin:1rem 0 1.4rem 0}'
+    '.kartu-tgl{background:#fff;border:1px solid #e6e3dc;border-radius:6px;padding:1rem 1.1rem}'
+    '.kt-tgl{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7a7f8a}'
+    '.kt-luas{font-family:"Source Serif 4",Georgia,serif;font-variant-numeric:oldstyle-nums;font-size:2rem;color:#1f2a44;margin-top:.35rem;line-height:1.1}'
+    '.kt-luas span{font-size:1rem;color:#4b5160}'
+    '.kt-sub{font-size:.76rem;color:#9a9ea8;margin-top:.15rem}'
+    '.kt-kat{display:flex;align-items:center;gap:.4rem;font-weight:700;margin-top:.7rem;font-size:.95rem}'
+    '.kt-pil{margin-top:.65rem}'
+    '.penjelasan{display:grid;gap:.45rem;font-size:.84rem;color:#4b5160}'
+    '.penjelasan>div{display:flex;gap:.5rem;align-items:flex-start}'
+    '.pj-cat{color:#7a7f8a;font-size:.8rem;margin-top:.2rem}'
     '.konteks{font-size:.88rem;color:#4b5160;line-height:1.65}'
     '.konteks b{color:#1f2a44}'
     '.catatan{background:#fbf6ea;border:1px solid #efe1bd;color:#7a5a12;border-radius:4px;padding:.55rem .75rem;font-size:.82rem;margin-top:.5rem;display:flex;gap:.45rem;align-items:flex-start}'
     '.kosong{border:1px dashed #d7d3cb;border-radius:6px;padding:2.6rem 1rem;text-align:center;color:#7a7f8a;background:#fbfaf7}'
+    '.tabel-wadah{overflow-x:auto;border:1px solid #e6e3dc;border-radius:6px;background:#fff}'
+    '.tabel-kanal{width:100%;border-collapse:collapse;font-size:.84rem;color:#4b5160}'
+    '.tabel-kanal th{text-align:left;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#7a7f8a;font-weight:600;padding:.6rem .8rem;border-bottom:1px solid #e6e3dc;background:#fbfaf7}'
+    '.tabel-kanal td{padding:.55rem .8rem;border-bottom:1px solid #f0ede6;vertical-align:top}'
+    '.tabel-kanal tr:last-child td{border-bottom:none}'
+    '.tabel-kanal code{background:#f3f2ee;color:#1f2a44;padding:.05rem .3rem;border-radius:3px;font-size:.8rem;white-space:nowrap}'
     '@media (max-width:640px){.judul-app{font-size:1.9rem}.stat{border-right:none;border-bottom:1px solid #e6e3dc}.stat:last-child{border-bottom:none}.stat-nilai{font-size:1.8rem}}'
     '</style>'
 )
@@ -91,8 +108,8 @@ def kepala_html(meta_teks_riwayat):
     return (
         f'<div class="alis">{ikon_ui("gelombang", "#7a7f8a")} Prediksi genangan multisensor</div>'
         '<div class="judul-app">Water on Jabodetabek</div>'
-        '<div class="sub-app">Simulasikan curah hujan atau cek tanggal tertentu, lalu lihat peta genangan yang '
-        'diprediksi model untuk observasi Sentinel-1 berikutnya.</div>'
+        '<div class="sub-app">Pilih satu sampai lima tanggal, tentukan sumber curah hujan, lalu lihat peta genangan '
+        'yang diprediksi model beserta perbandingannya dengan kondisi normal bulan yang sama.</div>'
         f'<div class="riwayat">{ikon_ui("satelit")}<span>{meta_teks_riwayat}</span></div>'
     )
 
@@ -119,26 +136,49 @@ def catatan_html(teks):
     return f'<div class="catatan">{ikon_ui("peringatan", "#a07614")}<span>{teks}</span></div>'
 
 
-def donat_html(persen, status):
-    p = min(max(float(persen), 0.0), 100.0)
-    r, tebal = 92.0, 18.0
-    keliling = 2 * math.pi * r
-    busur = keliling * p / 100
-    warna = WARNA_STATUS[status]
-    svg = (
-        f'<svg class="donat-svg" viewBox="0 0 240 240" role="img" aria-label="Tergenang {p:.2f} persen, status {status}">'
-        f'<circle cx="120" cy="120" r="{r}" fill="none" stroke="{KERING}" stroke-width="{tebal}"/>'
-        f'<circle cx="120" cy="120" r="{r}" fill="none" stroke="{AIR}" stroke-width="{tebal}" '
-        f'stroke-dasharray="{busur:.3f} {keliling:.3f}" transform="rotate(-90 120 120)"/>'
-        f'<g transform="translate(96 58) scale(2)">{IKON_STATUS[status]}</g>'
-        f'<text x="120" y="140" text-anchor="middle" font-size="20" font-weight="600" fill="{warna}" '
-        f'font-family="Source Serif 4, Georgia, serif">{status}</text>'
-        f'<text x="120" y="162" text-anchor="middle" font-size="12.5" fill="#4b5160" font-family="Nunito Sans, sans-serif">'
-        f'{p:.2f}% tergenang</text>'
-        '</svg>'
+def ikon_kategori(nama, ukuran=22):
+    w = WARNA_KATEGORI[nama]
+    return (f'<svg width="{ukuran}" height="{ukuran}" viewBox="0 0 24 24" aria-hidden="true" style="flex:none">'
+            f'{IKON_KATEGORI[nama].replace("{w}", w)}</svg>')
+
+
+def pil(teks, warna):
+    return (f'<span class="pil" style="color:{warna};border-color:{warna}33;background:{warna}12">{teks}</span>')
+
+
+def kartu_tanggal_html(daftar):
+    isi = []
+    for h in daftar:
+        k = h['kategori']
+        kd = h['keandalan']
+        perubahan = h['perubahan_km2']
+        isi.append(
+            '<div class="kartu-tgl">'
+            f'<div class="kt-tgl">{h["judul"]}</div>'
+            f'<div class="kt-luas">{h["luas_teks"]}<span> km²</span></div>'
+            f'<div class="kt-sub">{"+" if perubahan >= 0 else "−"}{h["perubahan_teks"]} km² dari observasi terakhir</div>'
+            f'<div class="kt-kat">{ikon_kategori(k["nama"])}<span style="color:{WARNA_KATEGORI[k["nama"]]}">{k["nama"]}</span></div>'
+            f'<div class="kt-sub">normal bulan ini {h["normal_teks"]} km²</div>'
+            f'<div class="kt-pil">{pil("Keandalan " + kd["label"].lower(), WARNA_KEANDALAN[kd["tingkat"]])}'
+            f'{pil(str(h["langkah_ke"]) + " langkah", TEKS_REDUP)}</div>'
+            '</div>'
+        )
+    return f'<div class="grid-tgl">{"".join(isi)}</div>'
+
+
+def penjelasan_html():
+    return (
+        '<div class="penjelasan">'
+        f'<div>{ikon_kategori("Di bawah normal", 18)}<span><b>Di bawah normal</b>: luas genangan lebih kecil dari '
+        '25% kejadian historis pada bulan yang sama.</span></div>'
+        f'<div>{ikon_kategori("Normal", 18)}<span><b>Normal</b>: berada di antara persentil 25 dan 75 historis bulan '
+        'yang sama.</span></div>'
+        f'<div>{ikon_kategori("Di atas normal", 18)}<span><b>Di atas normal</b>: lebih luas dari 75% kejadian '
+        'historis bulan yang sama.</span></div>'
+        '<div class="pj-cat">Tanggal jauh diprediksi berantai: hasil satu langkah (sekitar 12 hari) menjadi riwayat '
+        'langkah berikutnya, sehingga keandalan menurun seiring jumlah langkah.</div>'
+        '</div>'
     )
-    legenda = legenda_html([(AIR, f'Tergenang {p:.2f}%'), (KERING, f'Tidak tergenang {100 - p:.2f}%')])
-    return f'<div class="donat-wadah">{svg}{legenda}</div>'
 
 
 def konteks_html(baris):
@@ -234,3 +274,61 @@ def png_laporan(panel, judul, subjudul, skala=2):
     buf = io.BytesIO()
     kanvas.save(buf, format='PNG')
     return buf.getvalue()
+
+
+def figur_tren(daftar, observasi, normal_bulanan):
+    fig = go.Figure()
+    xs = [d for d, _, _ in normal_bulanan]
+    fig.add_trace(go.Scatter(x=xs + xs[::-1], y=[p75 for _, _, p75 in normal_bulanan] + [p25 for _, p25, _ in normal_bulanan][::-1],
+                             fill='toself', fillcolor='rgba(91,107,132,0.13)', line=dict(width=0), hoverinfo='skip',
+                             name='Rentang normal (P25–P75)'))
+    fig.add_trace(go.Scatter(x=[observasi[0]], y=[observasi[1]], mode='markers', name='Observasi terakhir',
+                             marker=dict(size=11, color='#ffffff', line=dict(color=NAVY, width=2)),
+                             hovertemplate='Observasi %{x|%d %b %Y}<br>%{y:.1f} km²<extra></extra>'))
+    fig.add_trace(go.Scatter(x=[observasi[0]] + [h['tanggal'] for h in daftar],
+                             y=[observasi[1]] + [h['luas_km2'] for h in daftar], mode='lines',
+                             line=dict(color=NAVY, width=1.5, dash='dot'), hoverinfo='skip', showlegend=False))
+    fig.add_trace(go.Scatter(x=[h['tanggal'] for h in daftar], y=[h['luas_km2'] for h in daftar], mode='markers',
+                             name='Prediksi',
+                             marker=dict(size=13, color=[WARNA_KATEGORI[h['kategori']['nama']] for h in daftar],
+                                         line=dict(color='#ffffff', width=1.5)),
+                             customdata=[[h['kategori']['nama'], h['keandalan']['label']] for h in daftar],
+                             hovertemplate='%{x|%d %b %Y}<br>%{y:.1f} km²<br>%{customdata[0]}<br>Keandalan %{customdata[1]}<extra></extra>'))
+    fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
+                      legend=dict(orientation='h', y=-0.18, x=0, font=dict(size=11)),
+                      yaxis=dict(title='Luas genangan (km²)', gridcolor='#efede7', zeroline=False),
+                      xaxis=dict(gridcolor='#efede7'), hoverlabel=dict(bgcolor='#ffffff', font=dict(color=NAVY)))
+    return fig
+
+
+def figur_keandalan(keandalan):
+    fig = go.Figure()
+    for mode, warna, nama in (('resmi', NAVY, 'Hujan aktual (GPM)'), ('klimatologi', '#9db3d1', 'Hujan rata-rata bulanan')):
+        t = keandalan[mode]
+        fig.add_trace(go.Scatter(x=[b['langkah'] for b in t], y=[b['F1'] for b in t], mode='lines+markers', name=nama,
+                                 line=dict(color=warna, width=2), marker=dict(size=8),
+                                 error_y=dict(type='data', array=[b['F1_std'] for b in t], color=warna, thickness=1),
+                                 customdata=[b['hari_rata'] for b in t],
+                                 hovertemplate='Langkah %{x} (±%{customdata:.0f} hari)<br>F1 %{y:.3f}<extra></extra>'))
+    t = keandalan['resmi']
+    fig.add_trace(go.Scatter(x=[b['langkah'] for b in t], y=[b['F1_persistence'] for b in t], mode='lines+markers',
+                             name='Persistence', line=dict(color='#b9b4aa', width=1.5, dash='dash'), marker=dict(size=6),
+                             hovertemplate='Langkah %{x}<br>F1 %{y:.3f}<extra></extra>'))
+    fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
+                      legend=dict(orientation='h', y=-0.22, x=0, font=dict(size=11)),
+                      yaxis=dict(title='F1', range=[0, 1], gridcolor='#efede7'),
+                      xaxis=dict(title='Jumlah langkah prediksi berantai', dtick=1, gridcolor='#efede7'))
+    return fig
+
+
+def figur_akurasi_luas(scene):
+    x = [datetime.strptime(s['tanggal'], '%Y%m%d') for s in scene]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x, y=[s['luas_aktual_km2'] for s in scene], mode='lines+markers', name='Aktual (SAR)',
+                             line=dict(color='#7a7f8a', width=2)))
+    fig.add_trace(go.Scatter(x=x, y=[s['luas_pred_km2'] for s in scene], mode='lines+markers', name='Prediksi',
+                             line=dict(color=NAVY, width=2)))
+    fig.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
+                      legend=dict(orientation='h', y=-0.2, x=0), yaxis=dict(title='Luas genangan (km²)', gridcolor='#efede7'),
+                      xaxis=dict(gridcolor='#efede7'))
+    return fig

@@ -1,4 +1,4 @@
-# topik1/data_nasa.py
+# data_nasa.py
 import math
 from datetime import date, timedelta
 from urllib.parse import urlparse
@@ -149,39 +149,16 @@ def resample_bilinear(lon_c, lat_c, nilai, lon_px, lat_px):
     return np.where(m_out > 0.999, v_out / np.maximum(m_out, 1e-6), np.nan).astype(np.float32)
 
 
-def ambil_hujan(kred, tgl_akhir, extent, lon_px, lat_px, lapor=None, mundur_maks=2):
-    sesi = buat_sesi(kred)
-    catatan = []
-    akhir = tgl_akhir
-    harian = {}
-    for geser in range(mundur_maks + 1):
-        akhir = tgl_akhir - timedelta(days=geser)
-        if lapor:
-            lapor(f'Mencari data GPM IMERG {akhir.isoformat()}')
-        hasil = unduh_imerg_hari(sesi, akhir, extent)
-        if hasil is not None:
-            harian[akhir] = hasil
-            break
-    if not harian:
-        raise GagalUnduh(f'Data GPM IMERG harian sampai {tgl_akhir.isoformat()} belum tersedia di NASA.')
-    if akhir != tgl_akhir:
-        catatan.append(f'Data GPM {tgl_akhir.isoformat()} belum tersedia; jendela hujan diakhiri {akhir.isoformat()}.')
-    for i in range(1, 7):
-        d = akhir - timedelta(days=i)
-        if lapor:
-            lapor(f'Mengunduh GPM IMERG {d.isoformat()} ({i + 1}/7)')
-        hasil = unduh_imerg_hari(sesi, d, extent)
-        if hasil is None:
-            raise GagalUnduh(f'Data GPM IMERG {d.isoformat()} tidak ditemukan.')
-        harian[d] = hasil
-    urut = [akhir - timedelta(days=i) for i in range(7)]
-    contoh = harian[akhir]
-    peta = {d: resample_bilinear(contoh['lon'], contoh['lat'], harian[d]['nilai'], lon_px, lat_px) for d in urut}
-    produk = sorted({harian[d]['produk'] for d in urut})
-    return {'rf24': peta[urut[0]],
-            'rf72': np.sum([peta[d] for d in urut[:3]], axis=0),
-            'rf7d': np.sum([peta[d] for d in urut], axis=0),
-            'akhir_jendela': akhir, 'produk': produk, 'catatan': catatan}
+def jendela_hujan(harian, tgl_akhir, lon_px, lat_px):
+    hari = [tgl_akhir - timedelta(days=i) for i in range(7)]
+    if any(harian.get(d) is None for d in hari):
+        return None
+    contoh = harian[hari[0]]
+    nilai = [harian[d]['nilai'] for d in hari]
+    jumlah = {'rf24': nilai[0], 'rf72': np.sum(nilai[:3], axis=0), 'rf7d': np.sum(nilai, axis=0)}
+    peta = {x: resample_bilinear(contoh['lon'], contoh['lat'], v, lon_px, lat_px) for x, v in jumlah.items()}
+    peta['produk'] = sorted({harian[d]['produk'] for d in hari})
+    return peta
 
 
 def _tanggal_modis(kode):
@@ -266,5 +243,5 @@ def ambil_modis(tgl, extent, lon_px, lat_px, lapor=None):
             ndwi = (refl['b04'] - refl['b02']) / (refl['b04'] + refl['b02'])
         ndvi = np.where(np.isfinite(ndvi), np.clip(ndvi, -1, 1), np.nan).astype(np.float32)
         ndwi = np.where(np.isfinite(ndwi), np.clip(ndwi, -1, 1), np.nan).astype(np.float32)
-        return {'ndvi': ndvi, 'ndwi': ndwi, 'komposit': _tanggal_modis(kode)}
+        return {'ndvi': ndvi, 'ndwi': ndwi, 'komposit': _tanggal_modis(kode), 'kode': kode}
     raise GagalUnduh('Komposit MODIS untuk tanggal tersebut belum tersedia.')
