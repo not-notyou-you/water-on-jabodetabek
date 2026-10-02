@@ -47,6 +47,13 @@ except (FileNotFoundError, ValueError, RuntimeError, KeyError) as e:
     st.stop()
 
 meta = artefak['meta']
+KUNCI_V3 = ['norm_modis', 'norm_hist', 'klimatologi', 'rantai', 'keandalan', 'akurasi']
+kunci_hilang = [k for k in KUNCI_V3 if k not in meta]
+if kunci_hilang:
+    st.error(f'meta.json di folder artefak masih versi lama (versi kontrak {meta.get("versi_kontrak", "?")}); kunci '
+             f'{", ".join(kunci_hilang)} belum ada. Unggah meta.json, normal.npz, dan akurasi.npz terbaru dari '
+             'deploy/topik1 hasil chunk ekspor_11 sampai ekspor_15.')
+    st.stop()
 darat = artefak['kondisi']['darat']
 TGL_AKHIR = inti.tanggal_riwayat_akhir(meta)
 GAP_MIN = int(meta['rantai']['gap_min'])
