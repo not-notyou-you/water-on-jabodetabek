@@ -1,387 +1,173 @@
 # tampilan.py
-import io
-import math
-from datetime import datetime
-
 import numpy as np
 import plotly.graph_objects as go
-from PIL import Image, ImageDraw, ImageFont
 
 NAVY = '#1f2a44'
-AIR = '#4a6fa5'
+GARIS = '#e6e3dc'
+REDUP = '#5f636c'
 KERING = '#ece9e2'
 LAUT = '#d5dce5'
-GARIS = '#e6e3dc'
-TEKS_REDUP = '#7a7f8a'
-WARNA_BANJIR = [KERING, AIR, LAUT]
-WARNA_PERUBAHAN = [KERING, NAVY, '#9db3d1', '#c98a1b', LAUT]
-WARNA_ANOMALI = [KERING, '#9db3d1', NAVY, '#c98a1b', LAUT]
-WARNA_KATEGORI = {'Di bawah normal': '#3f7d58', 'Normal': '#5b6b84', 'Di atas normal': '#b23b3b'}
-WARNA_KEANDALAN = {3: '#3f7d58', 2: '#c98a1b', 1: '#b23b3b', 0: '#7a7f8a'}
-SKALA_PROB = [[0.0, '#f3f2ee'], [0.45, '#9aa6bd'], [1.0, NAVY]]
-
-IKON_KATEGORI = {
-    'Di bawah normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M12 6.5v10M7.5 12.5l4.5 4.5 4.5-4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
-    'Normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M7.5 9.8h9M7.5 14.2h9" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>',
-    'Di atas normal': '<circle cx="12" cy="12" r="10" fill="{w}"/><path d="M12 17.5v-10M7.5 11.5l4.5-4.5 4.5 4.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
-}
-
-IKON_UI = {
-    'gelombang': ('<path d="M2 9c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2" '
-                  'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
-    'kalender': ('<rect x="3.5" y="5" width="17" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/>'
-                 '<path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
-    'satelit': ('<path d="M13 7l4 4-6 6-4-4 6-6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
-                '<path d="M15 5l2-2 4 4-2 2M9 15l-2 2M5 19l2-2M4 13a7 7 0 0 0 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
-    'info': ('<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/>'
-             '<path d="M12 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7.8" r="1.1" fill="currentColor"/>'),
-    'kunci': ('<circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/>'
-              '<path d="M11 12l9-9M17 6l3 3M15 8l2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
-    'peringatan': ('<path d="M10.3 3.4a2 2 0 0 1 3.4 0l8.6 15a2 2 0 0 1-1.7 3H3.4a2 2 0 0 1-1.7-3l8.6-15z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'
-                   '<path d="M12 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/>'),
-}
+WARNA_ANOMALI = [KERING, '#9db3d1', NAVY, '#d9a441', LAUT]
+LABEL_ANOMALI = ['Kering', 'Tergenang seperti biasa', 'Lebih basah dari biasa', 'Lebih kering dari biasa', 'Laut']
+URUTAN_LEGENDA = [2, 1, 3, 0, 4]
+WARNA_KATEGORI = {'Di bawah normal': '#3f7d58', 'Normal': '#4d5d78', 'Di atas normal': '#b23b3b'}
+IKON_KATEGORI = {'Di bawah normal': 'M12 6.5v10M7.5 12.5l4.5 4.5 4.5-4.5',
+                 'Normal': 'M7.5 9.8h9M7.5 14.2h9',
+                 'Di atas normal': 'M12 17.5v-10M7.5 11.5l4.5-4.5 4.5 4.5'}
+WARNA_YAKIN = {'Data asli': '#3f7d58', 'Tinggi': '#3f7d58', 'Sedang': '#9a6a12', 'Rendah': '#b23b3b',
+               'Belum teruji': REDUP}
 
 CSS = (
     '<style>'
     "@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap');"
-    'html,body,[class*="css"],.stMarkdown,.stTextInput,.stSlider,.stButton,.stTabs,.stDateInput{font-family:"Nunito Sans",system-ui,sans-serif}'
-    '.block-container{max-width:1120px;padding-top:5rem;padding-bottom:4rem}'
-    'h1,h2,h3{font-family:"Source Serif 4",Georgia,serif !important;color:#1f2a44 !important;font-weight:600 !important}'
-    '[data-testid="stVerticalBlockBorderWrapper"]{background:#ffffff;border-color:#e6e3dc !important;border-radius:6px}'
-    '.stButton>button,.stDownloadButton>button{border-radius:4px;letter-spacing:.03em;font-weight:600}'
-    '.stButton>button[kind="primary"]{background:#1f2a44;border-color:#1f2a44;padding:.6rem 1.6rem}'
+    'html,body,[class*="css"],.stMarkdown,.stButton,.stDateInput,.stExpander{font-family:"Nunito Sans",system-ui,sans-serif}'
+    '.block-container{max-width:880px;padding-top:4.5rem;padding-bottom:4rem}'
+    '[data-testid="stVerticalBlockBorderWrapper"]{background:#ffffff;border-color:#e6e3dc !important;border-radius:10px}'
+    '.stButton>button[kind="primary"]{background:#1f2a44;border-color:#1f2a44;min-height:3rem;font-weight:700;letter-spacing:.02em}'
     '.stButton>button[kind="primary"]:hover{background:#2c3a5c;border-color:#2c3a5c}'
-    '.stTabs [data-baseweb="tab-list"]{gap:1.5rem;border-bottom:1px solid #e6e3dc}'
-    '.stTabs [data-baseweb="tab"]{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:#7a7f8a;padding:.6rem 0}'
-    '.stTabs [aria-selected="true"]{color:#1f2a44}'
-    '.alis{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:#7a7f8a;margin-bottom:.2rem}'
-    '.judul-app{font-family:"Source Serif 4",Georgia,serif;font-size:2.5rem;line-height:1.1;color:#1f2a44;margin:0 0 .4rem 0;font-weight:600}'
-    '.sub-app{color:#4b5160;font-size:1rem;max-width:720px;margin-bottom:.4rem}'
-    '.riwayat{color:#7a7f8a;font-size:.85rem;display:flex;align-items:center;gap:.4rem;margin-bottom:1rem}'
-    '.ikon-ui{display:inline-block;width:1.05em;height:1.05em;vertical-align:-0.17em;flex:none}'
-    '.label-kecil{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7a7f8a;text-align:center;margin:.2rem 0 .5rem 0}'
-    '.rentang{font-size:.74rem;color:#9a9ea8;margin:-.9rem 0 .7rem 0}'
-    '.info-tanggal{font-size:.88rem;color:#4b5160;display:flex;align-items:center;gap:.4rem;margin:.2rem 0 .6rem 0}'
-    '.statistik{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-top:1px solid #e6e3dc;border-bottom:1px solid #e6e3dc;margin:1.2rem 0 1.4rem 0}'
-    '.stat{padding:1.2rem 1rem;text-align:center;border-right:1px solid #e6e3dc}'
-    '.stat:last-child{border-right:none}'
-    '.stat-label{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:#7a7f8a}'
-    '.stat-nilai{font-family:"Source Serif 4",Georgia,serif;font-variant-numeric:oldstyle-nums;font-size:2.1rem;color:#1f2a44;margin-top:.45rem;line-height:1.15}'
-    '.stat-ket{font-size:.78rem;color:#9a9ea8;margin-top:.25rem}'
-    '.legenda{display:flex;justify-content:center;flex-wrap:wrap;gap:.3rem 1.1rem;font-size:.78rem;color:#7a7f8a;margin-top:.4rem}'
-    '.kotak{display:inline-block;width:.7rem;height:.7rem;margin-right:.35rem;vertical-align:-0.05rem;border:1px solid #d7d3cb}'
-    '.donat-wadah{max-width:240px;margin:0 auto;text-align:center}'
-    '.donat-svg{width:100%;height:auto;display:block}'
-    '.pil{display:inline-block;font-size:.72rem;padding:.12rem .5rem;border:1px solid;border-radius:999px;margin-right:.35rem;font-weight:600}'
-    '.grid-tgl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.8rem;margin:1rem 0 1.4rem 0}'
-    '.kartu-tgl{background:#fff;border:1px solid #e6e3dc;border-radius:6px;padding:1rem 1.1rem}'
-    '.kt-tgl{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7a7f8a}'
-    '.kt-luas{font-family:"Source Serif 4",Georgia,serif;font-variant-numeric:oldstyle-nums;font-size:2rem;color:#1f2a44;margin-top:.35rem;line-height:1.1}'
-    '.kt-luas span{font-size:1rem;color:#4b5160}'
-    '.kt-sub{font-size:.76rem;color:#9a9ea8;margin-top:.15rem}'
-    '.kt-kat{display:flex;align-items:center;gap:.4rem;font-weight:700;margin-top:.7rem;font-size:.95rem}'
-    '.kt-pil{margin-top:.65rem}'
-    '.label-kanan{margin:0}'
-    
-    '.st-key-info_hujan button{color:#1f2a44;padding:0;min-height:0}'
-    '[data-testid="stDialog"] [role="dialog"]{border-radius:8px;border:1px solid #e6e3dc;background:#ffffff}'
-    '[data-testid="stDialog"]{background:rgba(0,0,0,0.5) !important;align-items:center !important}'
-    '[data-testid="stDialog"]>div:first-child{background:transparent !important;margin:auto !important;max-height:92vh}'
-    '[data-testid="stDialog"] section[role="dialog"]{max-height:88vh;overflow-y:auto}'
-    '.modal-isi{color:#4b5160;font-size:.92rem;line-height:1.6}'
-    '.modal-blok{display:flex;gap:.8rem;align-items:flex-start;padding:.9rem 0;border-top:1px solid #efede7}'
-    '.modal-blok:first-child{border-top:none;padding-top:.2rem}'
-    '.modal-nomor{flex:none;width:1.8rem;height:1.8rem;border-radius:50%;background:#1f2a44;color:#fff;display:flex;align-items:center;justify-content:center;font-family:"Source Serif 4",Georgia,serif;font-size:.95rem}'
-    '.modal-judul{font-family:"Source Serif 4",Georgia,serif;font-size:1.08rem;color:#1f2a44;font-weight:600;margin-bottom:.2rem}'
-    '.modal-cocok{font-size:.82rem;color:#7a7f8a;margin-top:.35rem}'
-    '.modal-cocok b{color:#1f2a44}'
-    '.modal-catatan{background:#f6f5f1;border:1px solid #e6e3dc;border-radius:6px;padding:.8rem .95rem;margin-top:.6rem;font-size:.86rem}'
-    '.penjelasan{display:grid;gap:.45rem;font-size:.84rem;color:#4b5160}'
-    '.penjelasan>div{display:flex;gap:.5rem;align-items:flex-start}'
-    '.pj-cat{color:#7a7f8a;font-size:.8rem;margin-top:.2rem}'
-    '.konteks{font-size:.88rem;color:#4b5160;line-height:1.65}'
-    '.konteks b{color:#1f2a44}'
-    '.catatan{background:#fbf6ea;border:1px solid #efe1bd;color:#7a5a12;border-radius:4px;padding:.55rem .75rem;font-size:.82rem;margin-top:.5rem;display:flex;gap:.45rem;align-items:flex-start}'
-    '.kosong{border:1px dashed #d7d3cb;border-radius:6px;padding:2.6rem 1rem;text-align:center;color:#7a7f8a;background:#fbfaf7}'
-    '.tabel-wadah{overflow-x:auto;border:1px solid #e6e3dc;border-radius:6px;background:#fff}'
-    '.tabel-kanal{width:100%;border-collapse:collapse;font-size:.84rem;color:#4b5160}'
-    '.tabel-kanal th{text-align:left;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#7a7f8a;font-weight:600;padding:.6rem .8rem;border-bottom:1px solid #e6e3dc;background:#fbfaf7}'
-    '.tabel-kanal td{padding:.55rem .8rem;border-bottom:1px solid #f0ede6;vertical-align:top}'
-    '.tabel-kanal tr:last-child td{border-bottom:none}'
-    '.tabel-kanal code{background:#f3f2ee;color:#1f2a44;padding:.05rem .3rem;border-radius:3px;font-size:.8rem;white-space:nowrap}'
-    '@media (max-width:640px){.judul-app{font-size:1.9rem}.stat{border-right:none;border-bottom:1px solid #e6e3dc}.stat:last-child{border-bottom:none}.stat-nilai{font-size:1.8rem}}'
+    '.stDateInput input{font-size:1.1rem;min-height:2.6rem}'
+    '[data-testid="stExpander"] details{border:none;border-top:1px solid #e6e3dc;border-radius:0;background:transparent}'
+    '[data-testid="stExpander"] summary{font-weight:700;font-size:1.05rem;color:#1f2a44;padding:1rem .2rem}'
+    '.alis{font-size:.75rem;letter-spacing:.2em;text-transform:uppercase;color:#5f636c}'
+    '.judul{font-family:"Source Serif 4",Georgia,serif;font-weight:600;font-size:2.75rem;line-height:1.1;color:#1f2a44;margin:.3rem 0 .5rem}'
+    '.pengantar{font-size:1.06rem;line-height:1.55;color:#4b5160;max-width:620px;margin-bottom:1.4rem}'
+    '.tanya{font-family:"Source Serif 4",Georgia,serif;font-size:1.4rem;font-weight:600;color:#1f2a44;margin-bottom:.2rem}'
+    '.kalimat{display:flex;gap:.9rem;align-items:flex-start;margin:1.6rem 0 1.2rem}'
+    '.kalimat p{margin:0;font-family:"Source Serif 4",Georgia,serif;font-size:1.6rem;line-height:1.35;color:#1f2a44}'
+    '.statistik{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));border-top:1px solid #e6e3dc;border-bottom:1px solid #e6e3dc;margin-bottom:1.4rem}'
+    '.stat{padding:1.3rem 1rem;text-align:center;border-left:1px solid #e6e3dc}'
+    '.stat:first-child{border-left:none}'
+    '.stat-label{font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;color:#5f636c}'
+    '.stat-nilai{font-family:"Source Serif 4",Georgia,serif;font-size:2.2rem;color:#1f2a44;margin-top:.35rem;line-height:1.15}'
+    '.stat-ket{font-size:.82rem;color:#5f636c;margin-top:.25rem}'
+    '.label-peta{font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;color:#5f636c;margin-bottom:.4rem}'
+    '.legenda{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem 1.1rem;font-size:.88rem;color:#4b5160;margin:.6rem 0}'
+    '.kotak{display:inline-block;width:.85rem;height:.85rem;border-radius:3px;border:1px solid #cfcac0;margin-right:.4rem;vertical-align:-.1rem}'
+    '.ket-peta{font-size:.82rem;color:#5f636c;text-align:center;line-height:1.6;margin-bottom:1.4rem}'
+    '.catatan{background:#fbf6ea;border:1px solid #efe1bd;color:#6b4f0f;border-radius:6px;padding:.6rem .8rem;font-size:.88rem;margin-top:.4rem}'
+    '.isi-lipat{color:#4b5160;line-height:1.65}'
+    '.isi-lipat h4{font-family:"Source Serif 4",Georgia,serif;font-size:1.12rem;font-weight:600;color:#1f2a44;margin:1.2rem 0 .3rem}'
+    '.isi-lipat h4:first-child{margin-top:.2rem}'
+    '.isi-lipat ul,.isi-lipat ol{margin:0;padding-left:1.3rem}'
+    '.isi-lipat li{margin-bottom:.35rem}'
+    '.batang{display:flex;align-items:center;gap:.7rem;font-size:.9rem;margin:.35rem 0}'
+    '.batang .lb{flex:0 0 150px;color:#4b5160}'
+    '.batang .bg{flex:1 1 auto;height:14px;background:#efede7;border-radius:3px;overflow:hidden}'
+    '.batang .isi{display:block;height:100%;background:#1f2a44}'
+    '.batang .sk{flex:0 0 44px;text-align:right;font-weight:700;color:#1f2a44}'
+    '@media (max-width:640px){.judul{font-size:2.1rem}.kalimat p{font-size:1.3rem}.stat{border-left:none;border-top:1px solid #e6e3dc}.stat:first-child{border-top:none}.batang .lb{flex-basis:110px}}'
     '</style>'
 )
 
 
-def ikon_ui(nama, warna=TEKS_REDUP):
-    return (f'<svg class="ikon-ui" viewBox="0 0 24 24" style="color:{warna}" aria-hidden="true">'
-            f'{IKON_UI[nama]}</svg>')
+def kepala_html():
+    return ('<div class="alis">Prediksi genangan · Jabodetabek</div>'
+            '<div class="judul">Water on Jabodetabek</div>'
+            '<div class="pengantar">Pilih tanggal, lalu lihat daerah mana yang diperkirakan tergenang dan apakah lebih '
+            'parah dari biasanya.</div>')
 
 
-def kepala_html(meta_teks_riwayat):
-    return (
-        f'<div class="alis">{ikon_ui("gelombang", "#7a7f8a")} Prediksi genangan multisensor</div>'
-        '<div class="judul-app">Water on Jabodetabek</div>'
-        '<div class="sub-app">Pilih satu sampai lima tanggal, tentukan sumber curah hujan, lalu lihat peta genangan '
-        'yang diprediksi model beserta perbandingannya dengan kondisi normal bulan yang sama.</div>'
-        f'<div class="riwayat">{ikon_ui("satelit")}<span>{meta_teks_riwayat}</span></div>'
-    )
-
-
-def label_kecil(teks):
-    return f'<div class="label-kecil">{teks}</div>'
+def kalimat_html(tanggal, kata, kategori, bulan):
+    w = WARNA_KATEGORI[kategori]
+    return ('<div class="kalimat">'
+            f'<svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true" style="flex:none;margin-top:2px">'
+            f'<circle cx="12" cy="12" r="11" fill="{w}"/><path d="{IKON_KATEGORI[kategori]}" fill="none" stroke="#fff" '
+            'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            f'<p>Pada <strong>{tanggal}</strong>, genangan di Jabodetabek {kata} '
+            f'<strong style="color:{w}">{kategori.upper()}</strong> untuk bulan {bulan}.</p></div>')
 
 
 def statistik_html(daftar):
-    isi = ''.join(
-        f'<div class="stat"><div class="stat-label">{label}</div><div class="stat-nilai">{nilai}</div>'
-        f'<div class="stat-ket">{ket}</div></div>'
-        for label, nilai, ket in daftar
-    )
+    isi = ''.join(f'<div class="stat"><div class="stat-label">{l}</div>'
+                  f'<div class="stat-nilai" style="color:{w}">{n}</div><div class="stat-ket">{k}</div></div>'
+                  for l, n, k, w in daftar)
     return f'<div class="statistik">{isi}</div>'
 
 
-def legenda_html(daftar):
-    isi = ''.join(f'<span><span class="kotak" style="background:{w}"></span>{l}</span>' for w, l in daftar)
-    return f'<div class="legenda">{isi}</div>'
+def legenda_html():
+    return '<div class="legenda">' + ''.join(
+        f'<span><span class="kotak" style="background:{WARNA_ANOMALI[i]}"></span>{LABEL_ANOMALI[i]}</span>'
+        for i in URUTAN_LEGENDA) + '</div>'
 
 
 def catatan_html(teks):
-    return f'<div class="catatan">{ikon_ui("peringatan", "#a07614")}<span>{teks}</span></div>'
+    return f'<div class="catatan">{teks}</div>'
 
 
-def ikon_kategori(nama, ukuran=22):
-    w = WARNA_KATEGORI[nama]
-    return (f'<svg width="{ukuran}" height="{ukuran}" viewBox="0 0 24 24" aria-hidden="true" style="flex:none">'
-            f'{IKON_KATEGORI[nama].replace("{w}", w)}</svg>')
+def figur_peta(kelas, lon, lat, rasio):
+    n = len(WARNA_ANOMALI)
+    skala = []
+    for i, w in enumerate(WARNA_ANOMALI):
+        skala += [[i / n, w], [(i + 1) / n, w]]
+    teks = np.asarray(LABEL_ANOMALI, dtype=object)[kelas]
+    fig = go.Figure(go.Heatmap(z=kelas, x=lon, y=lat, colorscale=skala, zmin=-0.5, zmax=n - 0.5, showscale=False,
+                               customdata=teks, hovertemplate='%{customdata}<extra></extra>'))
+    fig.update_layout(height=520, margin=dict(l=0, r=0, t=0, b=0), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
+                      xaxis=dict(visible=False, constrain='domain'),
+                      yaxis=dict(visible=False, scaleanchor='x', scaleratio=rasio, constrain='domain'),
+                      hoverlabel=dict(bgcolor='#ffffff', font=dict(color=NAVY, size=13), bordercolor=GARIS),
+                      dragmode=False)
+    return fig
 
 
-def pil(teks, warna):
-    return (f'<span class="pil" style="color:{warna};border-color:{warna}33;background:{warna}12">{teks}</span>')
+def akurasi_html(tanggal_akhir, keandalan):
+    batang = ''.join(
+        f'<div class="batang"><span class="lb">{b["langkah"]} langkah (±{round(b["hari_rata"])} hari)</span>'
+        f'<span class="bg"><span class="isi" style="width:{b["F1"] * 100:.0f}%"></span></span>'
+        f'<span class="sk">{b["F1"]:.2f}</span></div>'
+        for b in keandalan)
+    return ('<div class="isi-lipat">'
+            f'<p>Data satelit radar terakhir adalah {tanggal_akhir}. Semakin jauh tanggal yang dipilih, semakin banyak '
+            'langkah tebakan berantai (sekitar 12 hari per langkah), dan semakin turun ketepatannya. Skor di bawah '
+            'berasal dari uji pada data Maret–Juni 2026 (skor 1 = sempurna).</p>'
+            f'{batang}'
+            f'<p style="font-size:.9rem;color:#5f636c;margin-top:.6rem">Lebih dari {keandalan[-1]["langkah"]} langkah '
+            f'(sekitar {round(keandalan[-1]["hari_rata"] / 30)} bulan setelah {tanggal_akhir}) belum pernah diuji.</p>'
+            '</div>')
 
 
-def kartu_tanggal_html(daftar):
-    isi = []
-    for h in daftar:
-        k = h['kategori']
-        kd = h['keandalan']
-        perubahan = h['perubahan_km2']
-        isi.append(
-            '<div class="kartu-tgl">'
-            f'<div class="kt-tgl">{h["judul"]}</div>'
-            f'<div class="kt-luas">{h["luas_teks"]}<span> km²</span></div>'
-            f'<div class="kt-sub">{"+" if perubahan >= 0 else "−"}{h["perubahan_teks"]} km² dari observasi terakhir</div>'
-            f'<div class="kt-kat">{ikon_kategori(k["nama"])}<span style="color:{WARNA_KATEGORI[k["nama"]]}">{k["nama"]}</span></div>'
-            f'<div class="kt-sub">normal bulan ini {h["normal_teks"]} km²</div>'
-            f'<div class="kt-pil">{pil("Keandalan " + kd["label"].lower(), WARNA_KEANDALAN[kd["tingkat"]])}'
-            f'{pil(str(h["langkah_ke"]) + " langkah", TEKS_REDUP)}</div>'
-            '</div>'
-        )
-    return f'<div class="grid-tgl">{"".join(isi)}</div>'
-
-
-def penjelasan_html():
+def tentang_html(n_scene, periode, langkah_hari, tahun_awal, tahun_akhir):
     return (
-        '<div class="penjelasan">'
-        f'<div>{ikon_kategori("Di bawah normal", 18)}<span><b>Di bawah normal</b>: luas genangan lebih kecil dari '
-        '25% kejadian historis pada bulan yang sama.</span></div>'
-        f'<div>{ikon_kategori("Normal", 18)}<span><b>Normal</b>: berada di antara persentil 25 dan 75 historis bulan '
-        'yang sama.</span></div>'
-        f'<div>{ikon_kategori("Di atas normal", 18)}<span><b>Di atas normal</b>: lebih luas dari 75% kejadian '
-        'historis bulan yang sama.</span></div>'
-        '<div class="pj-cat">Tanggal jauh diprediksi berantai: hasil satu langkah (sekitar 12 hari) menjadi riwayat '
-        'langkah berikutnya, sehingga keandalan menurun seiring jumlah langkah.</div>'
+        '<div class="isi-lipat">'
+        '<h4>Apa ini?</h4>'
+        '<p>Aplikasi ini memperkirakan lokasi genangan air di Jabodetabek pada tanggal yang kamu pilih, lalu '
+        'membandingkannya dengan kondisi yang biasa terjadi. Aplikasi ini dibuat sebagai bagian dari penelitian skripsi.</p>'
+        '<h4>Dari mana datanya?</h4>'
+        '<ul>'
+        '<li><strong>Sentinel-1</strong>: satelit radar yang bisa melihat air di permukaan tanah, bahkan saat mendung. '
+        'Dari sini kita tahu lokasi mana yang tergenang.</li>'
+        '<li><strong>MODIS</strong>: satelit yang memotret kondisi tanaman dan kelembapan permukaan.</li>'
+        '<li><strong>GPM</strong>: satelit pengukur curah hujan.</li>'
+        '</ul>'
+        f'<p>Data yang dipakai adalah {n_scene} pengamatan dari {periode}.</p>'
+        '<h4>Bagaimana cara kerjanya?</h4>'
+        '<ol>'
+        '<li>Sebuah model kecerdasan buatan (ContextCNN) mempelajari bagaimana genangan berubah dari satu pengamatan '
+        'satelit ke pengamatan berikutnya.</li>'
+        f'<li>Untuk tanggal yang kamu pilih, model melihat tiga pengamatan satelit terakhir, lalu menebak kondisi '
+        f'sekitar {langkah_hari} hari ke depan.</li>'
+        f'<li>Kalau tanggalnya lebih jauh, tebakan itu dipakai lagi untuk menebak {langkah_hari} hari berikutnya, dan '
+        'seterusnya. Karena itu, semakin jauh tanggalnya, semakin rendah keyakinannya.</li>'
+        '<li>Curah hujan yang dipakai adalah rata-rata hujan yang biasa turun di bulan tersebut.</li>'
+        '</ol>'
+        '<h4>Cara membaca hasil</h4>'
+        '<ul>'
+        '<li><strong>Normal</strong>: luas genangan berada di kisaran yang biasa terjadi pada bulan yang sama di tahun '
+        f'{tahun_awal}–{tahun_akhir}. <strong>Di atas normal</strong> berarti lebih luas dari biasanya, '
+        '<strong>di bawah normal</strong> berarti lebih sempit.</li>'
+        '<li><strong>Peta</strong>: warna biru tua menandai lokasi yang diperkirakan tergenang padahal biasanya kering. '
+        'Biru muda adalah genangan yang memang biasa ada, misalnya tambak, waduk, dan sungai.</li>'
+        '<li><strong>Seberapa yakin?</strong>: <em>Tinggi</em> untuk sekitar 2 minggu pertama setelah pengamatan '
+        'terakhir, lalu turun menjadi <em>Sedang</em> dan <em>Rendah</em>. Lebih dari sekitar 3 bulan belum pernah diuji.</li>'
+        '</ul>'
+        '<h4>Apa yang perlu diingat?</h4>'
+        '<ul>'
+        '<li>Ini hasil penelitian, <strong>bukan peringatan banjir resmi</strong>. Untuk informasi resmi, rujuk BMKG dan '
+        'BPBD setempat.</li>'
+        '<li>Satu titik di peta mewakili area sekitar 50 × 50 meter, jadi genangan kecil di jalan atau gang tidak terlihat.</li>'
+        '<li>Satelit radar sulit melihat genangan di bawah pepohonan atau di antara gedung tinggi.</li>'
+        '<li>Model lebih banyak belajar dari lokasi yang biasa tergenang daripada dari curah hujan, sehingga hujan deras '
+        'yang tiba-tiba belum tentu tercermin.</li>'
+        '</ul>'
         '</div>'
     )
-
-
-def konteks_html(baris):
-    return '<div class="konteks">' + '<br>'.join(baris) + '</div>'
-
-
-def _tata_letak(fig, rasio, latar='#ffffff'):
-    fig.update_layout(
-        height=430, margin=dict(l=0, r=0, t=0, b=0), showlegend=False,
-        plot_bgcolor=latar, paper_bgcolor='#ffffff',
-        xaxis=dict(visible=False, constrain='domain'),
-        yaxis=dict(visible=False, scaleanchor='x', scaleratio=rasio, constrain='domain'),
-        hoverlabel=dict(bgcolor='#ffffff', font=dict(color=NAVY, size=12), bordercolor=GARIS),
-    )
-    return fig
-
-
-def figur_kelas(kelas, lon, lat, rasio, warna, label):
-    n = len(warna)
-    skala = []
-    for i, w in enumerate(warna):
-        skala += [[i / n, w], [(i + 1) / n, w]]
-    teks = np.asarray(label, dtype=object)[kelas]
-    fig = go.Figure(go.Heatmap(
-        z=kelas, x=lon, y=lat, colorscale=skala, zmin=-0.5, zmax=n - 0.5, showscale=False,
-        customdata=teks, hovertemplate='%{customdata}<br>%{x:.3f}° BT, %{y:.3f}°<extra></extra>',
-    ))
-    return _tata_letak(fig, rasio)
-
-
-def figur_probabilitas(prob, lon, lat, rasio):
-    laut = np.isnan(prob)
-    z = np.where(laut, -0.1, prob)
-    batas = 0.1 / 1.1
-    skala = [[0.0, LAUT], [batas, LAUT]] + [[batas + (1 - batas) * t, w] for t, w in SKALA_PROB]
-    skala[2][0] = batas + 1e-6
-    teks = np.where(laut, 'Laut', np.char.add('Probabilitas ', np.char.mod('%.3f', np.nan_to_num(prob))))
-    fig = go.Figure(go.Heatmap(
-        z=z, x=lon, y=lat, colorscale=skala, zmin=-0.1, zmax=1, showscale=False, customdata=teks,
-        hovertemplate='%{customdata}<br>%{x:.3f}° BT, %{y:.3f}°<extra></extra>',
-    ))
-    return _tata_letak(fig, rasio)
-
-
-def _hex_rgb(h):
-    h = h.lstrip('#')
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-
-
-def rgb_kelas(kelas, warna):
-    palet = np.array([_hex_rgb(w) for w in warna], np.uint8)
-    return palet[kelas]
-
-
-def rgb_probabilitas(prob):
-    titik = np.array([s[0] for s in SKALA_PROB])
-    warna = np.array([_hex_rgb(s[1]) for s in SKALA_PROB], np.float32)
-    p = np.nan_to_num(np.clip(prob, 0, 1), nan=0.0)
-    rgb = np.stack([np.interp(p, titik, warna[:, i]) for i in range(3)], axis=-1).astype(np.uint8)
-    rgb[np.isnan(prob)] = _hex_rgb(LAUT)
-    return rgb
-
-
-def _huruf(ukuran):
-    try:
-        return ImageFont.load_default(size=ukuran)
-    except TypeError:
-        return ImageFont.load_default()
-
-
-def png_laporan(panel, judul, subjudul, skala=2):
-    gambar_panel = [Image.fromarray(rgb).resize((rgb.shape[1] * skala, rgb.shape[0] * skala), Image.NEAREST)
-                    for rgb, _, _ in panel]
-    jarak = 40
-    lebar = sum(g.width for g in gambar_panel) + jarak * (len(panel) + 1)
-    tinggi_peta = max(g.height for g in gambar_panel)
-    tinggi = 110 + tinggi_peta + 30 + 26 * max(len(leg) for _, _, leg in panel) + 30
-    kanvas = Image.new('RGB', (lebar, tinggi), '#f6f5f1')
-    gambar = ImageDraw.Draw(kanvas)
-    gambar.text((jarak, 24), judul, fill=NAVY, font=_huruf(26))
-    gambar.text((jarak, 62), subjudul, fill='#4b5160', font=_huruf(15))
-    x = jarak
-    for g, (_, label, legenda) in zip(gambar_panel, panel):
-        gambar.text((x, 92), label.upper(), fill=TEKS_REDUP, font=_huruf(13))
-        kanvas.paste(g, (x, 112))
-        gambar.rectangle([x - 1, 111, x + g.width, 112 + g.height], outline=GARIS)
-        y = 112 + g.height + 18
-        for w, l in legenda:
-            gambar.rectangle([x, y, x + 14, y + 14], fill=w, outline='#cfcac0')
-            gambar.text((x + 22, y - 1), l, fill='#4b5160', font=_huruf(13))
-            y += 26
-        x += g.width + jarak
-    buf = io.BytesIO()
-    kanvas.save(buf, format='PNG')
-    return buf.getvalue()
-
-
-def figur_tren(daftar, observasi, normal_bulanan):
-    fig = go.Figure()
-    xs = [d for d, _, _ in normal_bulanan]
-    fig.add_trace(go.Scatter(x=xs + xs[::-1], y=[p75 for _, _, p75 in normal_bulanan] + [p25 for _, p25, _ in normal_bulanan][::-1],
-                             fill='toself', fillcolor='rgba(91,107,132,0.13)', line=dict(width=0), hoverinfo='skip',
-                             name='Rentang normal (P25–P75)'))
-    fig.add_trace(go.Scatter(x=[observasi[0]], y=[observasi[1]], mode='markers', name='Observasi terakhir',
-                             marker=dict(size=11, color='#ffffff', line=dict(color=NAVY, width=2)),
-                             hovertemplate='Observasi %{x|%d %b %Y}<br>%{y:.1f} km²<extra></extra>'))
-    fig.add_trace(go.Scatter(x=[observasi[0]] + [h['tanggal'] for h in daftar],
-                             y=[observasi[1]] + [h['luas_km2'] for h in daftar], mode='lines',
-                             line=dict(color=NAVY, width=1.5, dash='dot'), hoverinfo='skip', showlegend=False))
-    fig.add_trace(go.Scatter(x=[h['tanggal'] for h in daftar], y=[h['luas_km2'] for h in daftar], mode='markers',
-                             name='Prediksi',
-                             marker=dict(size=13, color=[WARNA_KATEGORI[h['kategori']['nama']] for h in daftar],
-                                         line=dict(color='#ffffff', width=1.5)),
-                             customdata=[[h['kategori']['nama'], h['keandalan']['label']] for h in daftar],
-                             hovertemplate='%{x|%d %b %Y}<br>%{y:.1f} km²<br>%{customdata[0]}<br>Keandalan %{customdata[1]}<extra></extra>'))
-    fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
-                      legend=dict(orientation='h', y=-0.18, x=0, font=dict(size=11)),
-                      yaxis=dict(title='Luas genangan (km²)', gridcolor='#efede7', zeroline=False),
-                      xaxis=dict(gridcolor='#efede7'), hoverlabel=dict(bgcolor='#ffffff', font=dict(color=NAVY)))
-    return fig
-
-
-def figur_keandalan(keandalan):
-    fig = go.Figure()
-    for mode, warna, nama in (('resmi', NAVY, 'Hujan aktual (GPM)'), ('klimatologi', '#9db3d1', 'Hujan rata-rata bulanan')):
-        t = keandalan[mode]
-        fig.add_trace(go.Scatter(x=[b['langkah'] for b in t], y=[b['F1'] for b in t], mode='lines+markers', name=nama,
-                                 line=dict(color=warna, width=2), marker=dict(size=8),
-                                 error_y=dict(type='data', array=[b['F1_std'] for b in t], color=warna, thickness=1),
-                                 customdata=[b['hari_rata'] for b in t],
-                                 hovertemplate='Langkah %{x} (±%{customdata:.0f} hari)<br>F1 %{y:.3f}<extra></extra>'))
-    t = keandalan['resmi']
-    fig.add_trace(go.Scatter(x=[b['langkah'] for b in t], y=[b['F1_persistence'] for b in t], mode='lines+markers',
-                             name='Persistence', line=dict(color='#b9b4aa', width=1.5, dash='dash'), marker=dict(size=6),
-                             hovertemplate='Langkah %{x}<br>F1 %{y:.3f}<extra></extra>'))
-    fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
-                      legend=dict(orientation='h', y=-0.22, x=0, font=dict(size=11)),
-                      yaxis=dict(title='F1', range=[0, 1], gridcolor='#efede7'),
-                      xaxis=dict(title='Jumlah langkah prediksi berantai', dtick=1, gridcolor='#efede7'))
-    return fig
-
-
-def figur_akurasi_luas(scene):
-    x = [datetime.strptime(s['tanggal'], '%Y%m%d') for s in scene]
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x, y=[s['luas_aktual_km2'] for s in scene], mode='lines+markers', name='Aktual (SAR)',
-                             line=dict(color='#7a7f8a', width=2)))
-    fig.add_trace(go.Scatter(x=x, y=[s['luas_pred_km2'] for s in scene], mode='lines+markers', name='Prediksi',
-                             line=dict(color=NAVY, width=2)))
-    fig.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), plot_bgcolor='#ffffff', paper_bgcolor='#ffffff',
-                      legend=dict(orientation='h', y=-0.2, x=0), yaxis=dict(title='Luas genangan (km²)', gridcolor='#efede7'),
-                      xaxis=dict(gridcolor='#efede7'))
-    return fig
-
-
-def modal_sumber_hujan_html():
-    blok = [
-        ('Sumber curah hujan',
-         'Bayangkan aplikasi ini seperti orang yang ingin menebak apakah jalan di depan rumahnya akan tergenang pada '
-         'tanggal tertentu. Untuk menebak, ia perlu tahu berapa banyak hujan yang turun menjelang tanggal itu. Ketiga '
-         'pilihan di bawah ini hanyalah tiga cara berbeda untuk memberi tahu aplikasi "hujannya seberapa banyak".',
-         None),
-        ('Rata-rata bulanan',
-         'Aplikasi memakai hujan yang biasanya turun di bulan itu, berdasarkan data 2023–2026. Kalau kamu memilih '
-         'tanggal di bulan Januari, aplikasi menganggap hujannya sebanyak hujan Januari pada umumnya, yaitu cukup '
-         'deras. Kalau Agustus, hujannya dianggap sedikit, seperti Agustus biasanya.',
-         'pertanyaan "kira-kira bagaimana kondisi genangan di tanggal itu kalau cuacanya biasa-biasa saja?" '
-         'Tidak perlu login apa pun.'),
-        ('Atur manual',
-         'Kamu sendiri yang menentukan seberapa deras hujannya lewat slider, atau cukup tekan tombol Kemarau, Normal, '
-         'atau Ekstrem. Ini seperti bertanya "bagaimana kalau...". Misalnya, "bagaimana kalau seminggu sebelum '
-         'tanggal itu hujan deras terus?"',
-         'mencoba-coba kemungkinan, misalnya membandingkan apa yang terjadi kalau musim kering dengan kalau hujan ekstrem.'),
-        ('Data resmi NASA',
-         'Aplikasi mengambil catatan hujan sungguhan yang diukur satelit NASA untuk hari-hari menjelang tanggal yang '
-         'kamu pilih. Jadi bukan perkiraan, tetapi hujan yang benar-benar turun. Karena datanya dari NASA, kamu perlu '
-         'akun NASA (gratis) untuk memakainya. Catatan hujan hanya ada untuk hari yang sudah lewat. Untuk tanggal hari '
-         'ini atau ke depan, aplikasi otomatis kembali memakai rata-rata bulanan, karena hujan masa depan belum bisa '
-         'diukur.',
-         'melihat kondisi tanggal yang sudah lewat, berdasarkan hujan yang benar-benar terjadi.'),
-    ]
-    isi = []
-    for i, (judul, teks, cocok) in enumerate(blok):
-        nomor = f'<div class="modal-nomor">{i + 1}</div>'
-        tambahan = f'<div class="modal-cocok"><b>Cocok untuk:</b> {cocok}</div>' if cocok else ''
-        isi.append(f'<div class="modal-blok">{nomor}<div><div class="modal-judul">{judul}</div>{teks}{tambahan}</div></div>')
-    catatan = ('<div class="modal-catatan"><b>Yang perlu diketahui:</b> ketiga pilihan ini biasanya menghasilkan peta '
-               'yang mirip. Itu bukan kesalahan. Dari data yang dipelajarinya, model ini menemukan bahwa genangan di '
-               'Jabodetabek lebih banyak ditentukan oleh di mana air biasanya menggenang (tambak, rawa, sungai, daerah '
-               'rendah) daripada oleh deras-tidaknya hujan beberapa hari terakhir. Hujan tetap berpengaruh, tetapi kecil.</div>')
-    return f'<div class="modal-isi">{"".join(isi)}{catatan}</div>'
